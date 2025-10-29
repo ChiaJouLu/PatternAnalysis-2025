@@ -1,5 +1,3 @@
-ls -la
-cat > README.md << 'EOF'
 # UNet 2D Prostate Segmentation
 
 **Author:** 47222610  
