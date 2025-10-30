@@ -273,3 +273,178 @@ class OutConv(nn.Module):
         """
         return self.conv(feature_map)
 
+class UNet(nn.Module):
+    """
+    Complete UNet architecture for 2D medical image segmentation.
+
+    For HipMRI Prostate Segmentation:
+        Input: (N, 1, 256, 128)  - Grayscale MRI images
+        Output: (N, 4, 256, 128) - 4-class segmentation
+            Class 0: Background
+            Class 1: Body outline
+            Class 2: Bone
+            Class 3: Prostate (target)
+    
+    Args:
+        n_channels (int): Number of input channels (1 for grayscale)
+        n_classes (int): Number of output segmentation classes (4 in this case)
+        
+    Architecture Details:
+        Level 0 (Input): 1 -> 64 channels, size: 256×128
+        Level 1: 64 -> 128 channels, size: 128×64 (after downsampling)
+        Level 2: 128 -> 256 channels, size: 64×32
+        Level 3: 256 -> 512 channels, size: 32×16
+        Level 4 (Bottleneck): 512 -> 1024 channels, size: 16×8
+        Level 3': 1024 -> 512 channels, size: 32×16 (after upsampling + skip)
+        Level 2': 512 -> 256 channels, size: 64×32
+        Level 1': 256 -> 128 channels, size: 128×64
+        Level 0' (Output): 128 -> 64 -> 4 channels, size: 256×128
+        
+    Example:
+        >>> model = UNet(n_channels=1, n_classes=4)
+        >>> feature_map = torch.randn(4, 1, 256, 128)  # Batch of 4 MRI images
+        >>> output = model(feature_map)
+        >>> print(output.shape)  # torch.Size([4, 4, 256, 128])
+        >>> 
+        >>> # Apply softmax to get probabilities
+        >>> probs = torch.softmax(output, dim=1)
+        >>> # Get predicted class for each pixel
+        >>> predictions = torch.argmax(probs, dim=1)
+        >>> print(predictions.shape)  # torch.Size([4, 256, 128])
+    """
+    
+    def __init__(self, n_channels, n_classes):
+        """
+        Initialize the UNet model.
+        
+        Args:
+            n_channels (int): Number of input channels
+                - 1 for grayscale medical images (MRI)
+            n_classes (int): Number of output segmentation classes
+                - For HipMRI: 4 (background, body, bone, prostate)
+        """
+        super(UNet, self).__init__()
+        
+        self.n_channels = n_channels
+        self.n_classes = n_classes
+        
+        # Encoder 
+        self.initConv = DoubleConv(n_channels, 64) # Initial convolution
+        self.down1 = Downsampling(64, 128)              # 256×128 -> 128×64
+        self.down2 = Downsampling(128, 256)             # 128×64 -> 64×32
+        self.down3 = Downsampling(256, 512)             # 64×32 -> 32×16
+        self.down4 = Downsampling(512, 1024)            # 32×16 -> 16×8 (bottleneck)
+        
+        # Decoder 
+        self.up1 = Upsampling(1024, 512)                # 16×8 -> 32×16
+        self.up2 = Upsampling(512, 256)                 # 32×16 -> 64×32
+        self.up3 = Upsampling(256, 128)                 # 64×32 -> 128×64
+        self.up4 = Upsampling(128, 64)                  # 128×64 -> 256×128
+        
+        # Output layer
+        self.outConv = OutConv(64, n_classes)      # Final 1×1 conv to n_classes
+    
+    def forward(self, feature_map):
+        """
+        Forward pass through the UNet.
+        
+        Args:
+            feature_map (torch.Tensor): Input images of shape (N, C_in, H, W)
+                For HipMRI: (N, 1, 256, 128)
+                
+        Returns:
+            torch.Tensor: Raw logits of shape (N, num_classes, H, W)
+                For HipMRI: (N, 4, 256, 128)
+            
+        Example:
+            >>> model = UNet(n_channels=1, n_classes=4)
+            >>> feature_map = torch.randn(2, 1, 256, 128)
+            >>> logits = model(x)
+            >>> 
+            >>> # For prediction:
+            >>> probs = torch.softmax(logits, dim=1)
+            >>> pred = torch.argmax(probs, dim=1)
+            >>> 
+            >>> # For training with CrossEntropyLoss:
+            >>> criterion = nn.CrossEntropyLoss()
+            >>> loss = criterion(logits, targets)
+        """
+        # Encoder path (with skip connections saved)
+        feature_map1 = self.initConv(feature_map) # 64 channels, same size
+        feature_map2 = self.down1(feature_map1)   # 128 channels, 1/2 size
+        feature_map3 = self.down2(feature_map2)   # 256 channels, 1/4 size
+        feature_map4 = self.down3(feature_map3)   # 512 channels, 1/8 size
+        feature_map5 = self.down4(feature_map4)   # 1024 channels, 1/16 size (bottleneck)
+        
+        # Decoder path (with skip connections from encoder)
+        feature_map = self.up1(feature_map5, feature_map4)  # 512 channels, 1/8 size
+        feature_map = self.up2(feature_map, feature_map3)   # 256 channels, 1/4 size
+        feature_map = self.up3(feature_map, feature_map2)   # 128 channels, 1/2 size
+        feature_map = self.up4(feature_map, feature_map1)   # 64 channels, original size
+        
+        # Output layer
+        logits = self.outConv(x) # n_classes channels, original size
+        
+        return logits
+
+
+if __name__ == "__main__":
+    """
+    Test script to verify UNet model architecture with dummy data.
+    """
+    print("="*70)
+    print("Testing UNet Model Architecture")
+    print("="*70)
+    
+    # Create model for HipMRI (1 input channel, 4 output classes)
+    print("\n1. Creating UNet model...")
+    model = UNet(n_channels=1, n_classes=4)
+    print(f"   ✓ Model created successfully")
+    
+    # Count parameters
+    print("\n2. Counting model parameters...")
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"   ✓ Total parameters: {total_params:,}")
+    print(f"   ✓ Trainable parameters: {trainable_params:,}")
+    
+    # Test forward pass with HipMRI dimensions
+    print("\n3. Testing forward pass with HipMRI dimensions...")
+    batch_size = 2
+    x = torch.randn(batch_size, 1, 256, 128)
+    print(f"   Input shape: {x.shape}")
+    
+    with torch.no_grad():
+        output = model(x)
+    
+    print(f"   ✓ Output shape: {output.shape}")
+    print(f"   ✓ Expected shape: torch.Size([{batch_size}, 4, 256, 128])")
+    
+    # Test prediction
+    print("\n4. Testing prediction conversion...")
+    with torch.no_grad():
+        probs = torch.softmax(output, dim=1)
+        pred = torch.argmax(probs, dim=1)
+    
+    print(f"   ✓ Probability shape: {probs.shape}")
+    print(f"   ✓ Prediction shape: {pred.shape}")
+    print(f"   ✓ Unique predicted classes: {torch.unique(pred).tolist()}")
+    
+    # Test model on GPU if available
+    print("\n5. Checking GPU availability...")
+    if torch.cuda.is_available():
+        print(f"   ✓ GPU available: {torch.cuda.get_device_name(0)}")
+        print("   Testing model on GPU...")
+        model_gpu = model.cuda()
+        x_gpu = x.cuda()
+        with torch.no_grad():
+            output_gpu = model_gpu(x_gpu)
+        print(f"   ✓ GPU forward pass successful")
+        print(f"   ✓ GPU output shape: {output_gpu.shape}")
+    else:
+        print("   ⚠ No GPU available, will use CPU for training")
+    
+    print("\n" + "="*70)
+    print("All tests passed! ✓")
+    print("="*70)
+    print("\nUNet model is ready for training.")
