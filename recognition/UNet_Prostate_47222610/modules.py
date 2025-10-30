@@ -12,6 +12,11 @@ Architecture:
     - Skip connections: Combine high-resolution features from encoder with 
       upsampled features in decoder
 
+Note:
+    Part of the documentation style and test scaffolding were written
+    with assistance from ChatGPT 4.1. All implementation logic
+    and verification were completed by the author.
+
 Paper Reference:
     Ronneberger, O., Fischer, P., & Brox, T. (2015).
     U-Net: Convolutional Networks for Biomedical Image Segmentation.
