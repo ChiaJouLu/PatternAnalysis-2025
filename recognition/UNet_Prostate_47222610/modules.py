@@ -141,3 +141,85 @@ class Downsampling(nn.Module):
             torch.Tensor: Output tensor of shape (N, C_out, H/2, W/2)
         """
         return self.maxpool_conv(feature_map)
+
+class Upsampling(nn.Module):
+    """
+    Upsampling block in UNet decoder.
+    
+    This block performs:
+    1. Upsampling (2×2) to increase spatial dimensions by 2 times
+    2. Skip Connection: Concatenation with corresponding encoder features
+    3. Refines the combined features using DoubleConv
+    
+    Args:
+        in_channels (int): Number of input channels from previous decoder layer
+        out_channels (int): Number of output channels
+        
+    Architecture:
+        Decoder input: (N, in_channels, H, W)
+        -> ConvTranspose2d(2×2, stride=2)  # Upsample to (H*2, W*2)
+        
+        Encoder skip: (N, in_channels, H*2, W*2)
+        
+        Concatenate: (N, in_channels*2, H*2, W*2)
+        -> DoubleConv
+        Output: (N, out_channels, H*2, W*2)
+        
+    Example:
+        >>> upsampling = Upsampling(128, 64)
+        >>> feature_map1 = torch.randn(4, 128, 64, 32)   # From previous decoder layer
+        >>> feature_map2 = torch.randn(4, 128, 128, 64)  # From encoder (skip connection)
+        >>> out = upsampling(feature_map1, feature_map2)
+        >>> print(out.shape)  # torch.Size([4, 64, 128, 64])
+    """
+    
+    def __init__(self, in_channels, out_channels):
+        """
+        Initialize the upsampling block.
+        
+        Args:
+            in_channels (int): Number of input channels
+            out_channels (int): Number of output channels
+        """
+        super(Upsampling, self).__init__()
+        
+        # Transposed convolution for upsampling
+        self.upsampling = nn.ConvTranspose2d(in_channels, in_channels // 2, 
+                                     kernel_size=2, stride=2)
+        
+        # DoubleConv after concatenation
+        # Input is in_channels (in_channels//2 from upsampling + in_channels//2 from skip)
+        self.conv = DoubleConv(in_channels, out_channels)
+    
+    def forward(self, feature_map1, feature_map2):
+        """
+        Forward pass through the upsampling block.
+        
+        Args:
+            feature_map1 (torch.Tensor): Input from previous decoder layer (N, C, H, W)
+            feature_map2 (torch.Tensor): Skip connection from encoder (N, C, H*2, W*2)
+            
+        Returns:
+            torch.Tensor: Output tensor of shape (N, C_out, H*2, W*2)
+            
+        Note:
+            If feature_map1 and feature_map2 have slightly different spatial dimensions due to
+            odd-sized inputs, feature_map1 will be padded to match feature_map2's dimensions.
+        """
+        # Upsample feature_map1
+        feature_map1 = self.upsampling(feature_map1)
+        
+        # Handle potential size mismatch due to odd dimensions
+        # Calculate padding needed to match feature_map2's spatial dimensions
+        diffY = feature_map2.size()[2] - feature_map1.size()[2]  # Height difference
+        diffX = feature_map2.size()[3] - feature_map1.size()[3]  # Width difference
+        
+        # Pad feature_map1 if needed 
+        feature_map1 = F.pad(feature_map1, [diffX // 2, diffX - diffX // 2,
+                        diffY // 2, diffY - diffY // 2])
+        
+        # Concatenate 
+        feature_map = torch.cat([feature_map2, feature_map1], dim=1)
+        
+        # Apply double convolution
+        return self.conv(feature_map)
