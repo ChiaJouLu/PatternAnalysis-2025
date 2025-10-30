@@ -383,7 +383,7 @@ class UNet(nn.Module):
         feature_map = self.up4(feature_map, feature_map1)   # 64 channels, original size
         
         # Output layer
-        logits = self.outConv(x) # n_classes channels, original size
+        logits = self.outConv(feature_map) # n_classes channels, original size
         
         return logits
 
