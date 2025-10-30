@@ -223,3 +223,53 @@ class Upsampling(nn.Module):
         
         # Apply double convolution
         return self.conv(feature_map)
+
+class OutConv(nn.Module):
+    """
+    Output convolution layer for final segmentation mask.
+    
+    This is a simple 1×1 convolution that maps the final feature maps to
+    the desired number of output classes. No activation function is applied
+    here as it will be handled by the loss function.
+    
+    Args:
+        in_channels (int): Number of input channels
+        out_channels (int): Number of output classes
+        
+    Architecture:
+        Input: (N, in_channels, H, W)
+        -> Conv2d(1×1) # Change only the number of channels, without changing H/W
+        Output: (N, out_channels, H, W)
+        
+    Example:
+        >>> out_conv = OutConv(64, 4)  # 4 classes
+        >>> feature_map = torch.randn(4, 64, 256, 128)
+        >>> out = out_conv(feature_map)
+        >>> print(out.shape)  # torch.Size([4, 4, 256, 128])
+    """
+    
+    def __init__(self, in_channels, out_channels):
+        """
+        Initialize the output convolution layer.
+        
+        Args:
+            in_channels (int): Number of input channels
+            out_channels (int): Number of output classes
+        """
+        super(OutConv, self).__init__()
+        
+        # 1×1 convolution to map to output classes
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+    
+    def forward(self, feature_map):
+        """
+        Forward pass through the output convolution.
+        
+        Args:
+            feature_map (torch.Tensor): Input tensor of shape (N, C_in, H, W)
+            
+        Returns:
+            torch.Tensor: Output logits of shape (N, num_classes, H, W)
+        """
+        return self.conv(feature_map)
+
