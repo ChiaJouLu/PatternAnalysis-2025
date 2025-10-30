@@ -88,3 +88,56 @@ class DoubleConv(nn.Module):
         """
         return self.double_conv(feature_map)
 
+
+class Downsampling(nn.Module):
+    """
+    Downsampling block in UNet encoder, which captures context while reducing 
+    spatial resolution.
+    
+    This block performs:
+    1. MaxPooling (2×2) to reduce spatial dimensions in a half
+    2. Extracts features at the new resolution using double convolution
+    
+    Args:
+        in_channels (int): Number of input channels
+        out_channels (int): Number of output channels
+        
+    Architecture:
+        Input: (N, in_channels, H, W)
+        -> MaxPool2d(2×2)  # Reduces to (H/2, W/2)
+        -> DoubleConv
+        Output: (N, out_channels, H/2, W/2)
+        
+    Example:
+        >>> down = Downsampling(64, 128)
+        >>> feature_map = torch.randn(4, 64, 256, 128)
+        >>> out = down(feature_map)
+        >>> print(out.shape)  # torch.Size([4, 128, 128, 64])
+    """
+    
+    def __init__(self, in_channels, out_channels):
+        """
+        Initialize the downsampling block.
+        
+        Args:
+            in_channels (int): Number of input channels
+            out_channels (int): Number of output channels
+        """
+        super(Downsampling, self).__init__()
+        
+        self.maxpool_conv = nn.Sequential(
+            nn.MaxPool2d(2),  # Downsample use 2x2
+            DoubleConv(in_channels, out_channels)
+        )
+    
+    def forward(self, feature_map):
+        """
+        Forward pass through the downsampling block.
+        
+        Args:
+            feature_map (torch.Tensor): Input tensor of shape (N, C_in, H, W)
+            
+        Returns:
+            torch.Tensor: Output tensor of shape (N, C_out, H/2, W/2)
+        """
+        return self.maxpool_conv(feature_map)
