@@ -8,6 +8,11 @@ Author: 47222610
 Date: October 2025
 Assignment: Pattern Recognition Project - 2D Prostate Segmentation
 
+Note:
+    Part of the documentation style and test scaffolding were written
+    with assistance from ChatGPT 4.1. All implementation logic
+    and verification were completed by the author.
+
 References:
     - Assignment Appendix B: Provided utility functions
     - NIfTI file format: https://nifti.nimh.nih.gov/
