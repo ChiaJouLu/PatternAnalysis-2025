@@ -17,33 +17,32 @@ import cv2
 from modules import UNet
 from dataset import load_data_2D
 
-
-
 def load_data_with_resize(image_paths, target_size=(256, 128), normImage=True):
     """
     Load the image and resize it to a uniform size.
     """
     n = len(image_paths)
     images = np.zeros((n, target_size[0], target_size[1]), dtype=np.float32)
-    
+
     for i, path in enumerate(tqdm(image_paths, desc='Loading images')):
         img = nib.load(path).get_fdata(caching='unchanged')
-        
+
         if len(img.shape) == 3:
             img = img[:, :, 0]
-        
+
         # Resize if needed
         if img.shape != target_size:
-            img = cv2.resize(img, (target_size[1], target_size[0]), 
+            img = cv2.resize(img, (target_size[1], target_size[0]),
                            interpolation=cv2.INTER_LINEAR)
-        
+
         # Normalize
         if normImage:
             img = (img - img.mean()) / (img.std() + 1e-8)
-        
+
         images[i] = img
-    
+
     return images
+
 
 def load_labels_with_resize(seg_paths, target_size=(256, 128), n_classes=4):
     """
@@ -51,26 +50,27 @@ def load_labels_with_resize(seg_paths, target_size=(256, 128), n_classes=4):
     """
     n = len(seg_paths)
     labels = np.zeros((n, target_size[0], target_size[1], n_classes), dtype=np.float32)
-    
+
     for i, path in enumerate(tqdm(seg_paths, desc='Loading labels')):
         label = nib.load(path).get_fdata(caching='unchanged')
-        
+
         if len(label.shape) == 3:
             label = label[:, :, 0]
-        
+
         # Resize (Use INTER_NEAREST to keep the category unchanged)
         if label.shape != target_size:
-            label = cv2.resize(label, (target_size[1], target_size[0]), 
+            label = cv2.resize(label, (target_size[1], target_size[0]),
                              interpolation=cv2.INTER_NEAREST)
-        
+
         # Clean up redundant categories (should address the issues with categories 4 and 5)
         label[label >= n_classes] = 0
-        
+
         # One-hot encoding
         for c in range(n_classes):
             labels[i, :, :, c] = (label == c)
-    
+
     return labels
+
 
 def dice_coefficient_per_class(predicted, target, n_classes=4):
     """
@@ -85,37 +85,36 @@ def dice_coefficient_per_class(predicted, target, n_classes=4):
         dict: Dice scores for each class (class_0, class_1, class_2, class_3)
     """
     dice_scores = {}
-    
+
     for c in range(n_classes):
         # Extract specific class
         predicted_c = predicted[:, c, :, :]  # (N, H, W)
         target_c = target[:, c, :, :]        # (N, H, W)
-        
+
         # Calculate intersection and union
         intersection = (predicted_c * target_c).sum()
         denominator = predicted_c.sum() + target_c.sum()
-        
+
         # Handle empty cases
         if denominator == 0:
             dice_scores[f'class_{c}'] = 1.0  # Both empty = perfect match
         else:
             dice_scores[f'class_{c}'] = (2. * intersection / denominator).item()
-    
-    return dice_scores
 
+    return dice_scores
 
 
 def train_one_epoch(model, data_loader, loss_fn, optimizer, device):
     """
     This function trains the model for one epoch on the given data loader.
 
-    It goes through all the training data once and updates the model, includes 
+    It goes through all the training data once and updates the model, includes
     loss calculation, and backpropagation.
 
     Args:
         model: The neural network model to be trained.
-        data_loader: Iterable that provides batches of training data. Each batch 
-                     should be a tuple of input tensors and corresponding 
+        data_loader: Iterable that provides batches of training data. Each batch
+                     should be a tuple of input tensors and corresponding
                      segmentation masks or class labels.
         loss_fn: The loss function used to measure prediction error.
         optimizer: Updating model parameters (weights) based on computed gradients.
@@ -123,7 +122,7 @@ def train_one_epoch(model, data_loader, loss_fn, optimizer, device):
                 Both the model and data batches will be moved to this device.
 
     Returns:
-        A tuple (avg_loss, avg_dice), where avg_loss (float) is the average loss across 
+        A tuple (avg_loss, avg_dice), where avg_loss (float) is the average loss across
         all batches, and avg_dice (float) is the average Dice coefficient across all batches,
         used for segmentation performance monitoring.
     """
@@ -144,7 +143,7 @@ def train_one_epoch(model, data_loader, loss_fn, optimizer, device):
         # Move data to device (GPU/CPU)
         images = images.to(device) # (N, 1, H, W)
         labels = labels.to(device) # (N, 4, H, W)
-        
+
         # Forward
         outputs = model(images)
 
@@ -160,19 +159,19 @@ def train_one_epoch(model, data_loader, loss_fn, optimizer, device):
 
         # Use Dice to do monitor (no need gradient here)
         with torch.no_grad():
-            probs = torch.softmax(outputs, dim=1)     
+            probs = torch.softmax(outputs, dim=1)
             dice = dice_coefficient_per_class(probs, labels, n_classes=4)
 
         # Accumulate dice scores
         for key in running_dice.keys():
             running_dice[key] += dice[key]
 
-        running_loss += loss.item()  
-        batch_count += 1 
-            
+        running_loss += loss.item()
+        batch_count += 1
+
         # Update progress bar with prostate (class_3) Dice
         pbar.set_postfix({
-            'Loss': f'{loss.item():.4f}', 
+            'Loss': f'{loss.item():.4f}',
             'Prostate_Dice': f'{dice["class_3"]:.4f}'
         })
 
@@ -180,6 +179,69 @@ def train_one_epoch(model, data_loader, loss_fn, optimizer, device):
     avg_dice = {key: value / batch_count for key, value in running_dice.items()}
 
     return avg_loss, avg_dice
+
+
+def validate(model, data_loader, loss_fn, device):
+    """
+    Validate on validation set.
+    Similar to training but no backpropagation.
+
+    Args:
+        model: The neural network model being evaluated.
+        data_loader: Iterable that provides bathes of validation data.
+        loss_fn: The loss function used to compute prediction error during validation.
+        device: The computation device to run the validation on (e.g., 'cuda' or 'cpu').
+
+    Returns:
+        A tuple (avg_loss, avg_dice), where avg_loss (float) is the average loss across
+        all batches, and avg_dice (float) is the average Dice coefficient across all batches,
+        used for segmentation performance monitoring.
+    """
+    model.eval()
+
+    running_loss = 0.0
+    running_dice = {
+        'class_0': 0.0,  # Background
+        'class_1': 0.0,  # Peripheral Zone
+        'class_2': 0.0,  # Transition Zone
+        'class_3': 0.0   # Prostate (MAIN TARGET)
+    }
+    batch_count = 0
+
+    with torch.no_grad():
+        pbar = tqdm(data_loader, desc='Validation')
+
+        for images, labels in pbar:
+            images = images.to(device)
+            labels = labels.to(device)
+
+            outputs = model(images)
+
+            class_indices = torch.argmax(labels, dim=1)
+
+            loss = loss_fn(outputs, class_indices)
+            probs = torch.softmax(outputs, dim=1)
+            dice = dice_coefficient_per_class(probs, labels, n_classes=4)
+
+             # Accumulate dice scores
+            for key in running_dice.keys():
+                running_dice[key] += dice[key]
+
+            running_loss += loss.item()
+            batch_count += 1
+
+            # Update progress bar with prostate (class_3) Dice
+            pbar.set_postfix({
+                'Loss': f'{loss.item():.4f}',
+                'Prostate_Dice': f'{dice["class_3"]:.4f}'
+            })
+
+    avg_loss = running_loss / batch_count
+    avg_dice = {key: value / batch_count for key, value in running_dice.items()}  
+
+    return avg_loss, avg_dice
+
+
 
 
 
@@ -212,18 +274,18 @@ def main():
     print("\n[1] Loading training data...")
     train_image_paths = sorted(glob.glob(f'{DATA_PATH}/keras_slices_train/*.nii.gz'))
     train_seg_paths = sorted(glob.glob(f'{DATA_PATH}/keras_slices_seg_train/*.nii.gz'))
-    
+
     X_train = load_data_with_resize(train_image_paths, target_size=TARGET_SIZE, normImage=True)
     y_train = load_labels_with_resize(train_seg_paths, target_size=TARGET_SIZE, n_classes=4)
-    
+
     print(f"   Loaded {len(X_train)} training images")
     print(f"   Image shape: {X_train.shape}")
     print(f"   Label shape: {y_train.shape}")
-    
+
     # Convert to PyTorch tensors
     X_train_tensor = torch.from_numpy(X_train).unsqueeze(1).float()  # (N,1,H,W)
     y_train_tensor = torch.from_numpy(y_train).permute(0, 3, 1, 2).float()  # (N,4,H,W)
-    
+
     # Create DataLoader
     train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
@@ -234,23 +296,23 @@ def main():
         print(f"   Labels batch shape: {labels.shape}")
         print(f"   Labels argmax shape: {torch.argmax(labels, dim=1).shape}")
         break
-    
+
     # Initialize model
     print(f"\n[2] Initializing model on {DEVICE}...")
     model = UNet(n_channels=1, n_classes=4).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     print(f"   Model parameters: {sum(p.numel() for p in model.parameters()):,}")
-    
+
     # Training loop
     print(f"\n[3] Training for {NUM_EPOCHS} epochs...")
     print("-"*70)
-    
+
     for epoch in range(NUM_EPOCHS):
         train_loss, train_dice = train_one_epoch(
             model, train_loader, criterion, optimizer, DEVICE
         )
-        
+
         # Print detailed results
         print(f"Epoch [{epoch+1}/{NUM_EPOCHS}] Loss: {train_loss:.4f}")
         print(f"  Dice Scores:")
@@ -259,7 +321,7 @@ def main():
         print(f"    Class 2 (Transition):     {train_dice['class_2']:.4f}")
         print(f"    Class 3 (Prostate):       {train_dice['class_3']:.4f} ★")
         print("-"*70)
-        
+
         # Save checkpoint every 10 epochs
         if (epoch + 1) % 10 == 0:
             checkpoint = {
@@ -272,7 +334,7 @@ def main():
             torch.save(checkpoint, f'unet_epoch_{epoch+1}.pth')
             print(f"   Checkpoint saved: unet_epoch_{epoch+1}.pth")
             print("-"*70)
-    
+
     # Save final model
     final_checkpoint = {
         'epoch': NUM_EPOCHS,
@@ -282,13 +344,13 @@ def main():
         'train_dice': train_dice,
     }
     torch.save(final_checkpoint, 'unet_final.pth')
-    
+
     print("\n[4] Training complete!")
     print(f"Final Prostate Dice Score: {train_dice['class_3']:.4f}")
     if train_dice['class_3'] >= 0.75:
-        print("✓ Target achieved! (Dice >= 0.75)")
+        print("Yeah! Target achieved! (Dice >= 0.75)")
     else:
-        print("✗ Target not reached. Consider training longer or adjusting hyperparameters.")
+        print("No! Target not reached. Consider training longer or adjusting hyperparameters.")
     print(f"Model saved to: unet_final.pth")
 
 
