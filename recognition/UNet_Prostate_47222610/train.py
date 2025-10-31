@@ -1,33 +1,97 @@
 """
-Training script for UNet Prostate Segmentation
-Author: s4722261
+Train Unet for prostate segmentation.
 
-Usage: python train.py
+This is the training script for the HipMRI dataset.
 """
 
+import numpy as np
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-# TODO: Import your modules
-# from modules import UNet2D
-# from dataset import HipMRIDataset
-# from utils import CombinedLoss, calculate_dice
+def dice_coefficient(predicted, target):
+    """
+    Calculate Dice coefficient for segmentation.
 
-# TODO: Implement train_epoch function
+    Args:
+        predicted: Predicted segmentated image.
+        target: Ground truth segmentated image.
 
-# TODO: Implement validate function
+    Returns:
+        Dice coefficient value as a float on range [0, 1].
+    """
+    if predicted.shape == target.shape:
+        batch, num_class = predicted.shape[:2]
+        pred_flat = predicted.reshape(batch, num_class, -1)
+        tar_flat = target.reshape(batch, num_class, -1)
 
-# TODO: Implement main training loop
-# Hint: Load data, create model, train, validate, save best model
+        # 0 intersect 1 = 0, only 1 intersect 1 = 1, same as multiplier
+        intersection = (pred_flat * tar_flat).sum(axis=2)
+        denominator = pred_flat.sum(axis=2) + tar_flat.sum(axis=2)
+
+        # Handle denominator = 0
+        dice = np.where(
+            denominator == 0, 
+            0, 
+            (2. * intersection) / denominator)
+
+        # Overall average, without further classes distinction
+        return dice.mean()
+
+
+
 
 if __name__ == "__main__":
-    # TODO: Set hyperparameters (learning rate, batch size, epochs)
-    # TODO: Create datasets and dataloaders
-    # TODO: Initialize model, optimizer, loss
-    # TODO: Training loop
-    # TODO: Plot and save results
-    pass
+    """
+    Main function that runs some small tests.
+    """
+    # Test dice_coefficient function
+    # Simulate 2 images, 2 classes, each image is 4x4
+    pred = np.array([
+        [[[0,1,0,0],
+          [1,1,0,0],
+          [0,0,1,1],
+          [0,0,0,1]],
+         
+         [[1,0,0,0],
+          [0,0,0,0],
+          [0,1,1,0],
+          [1,1,0,0]]],
+        
+        [[[0,1,0,1],
+          [1,1,1,0],
+          [0,0,0,1],
+          [0,0,1,1]],
 
+         [[1,0,0,0],
+          [0,0,0,1],
+          [1,1,0,0],
+          [0,1,1,0]]]
+    ])
+
+    target = np.array([
+        [[[0,1,0,0],
+          [1,1,0,0],
+          [0,0,1,0],
+          [0,0,0,1]],
+
+         [[1,0,0,0],
+          [0,0,0,0],
+          [0,1,1,1],
+          [1,1,0,0]]],
+
+        [[[0,1,0,1],
+          [1,1,0,0],
+          [0,0,0,1],
+          [0,0,1,1]],
+
+         [[1,0,0,0],
+          [0,0,0,1],
+          [1,1,0,0],
+          [0,1,1,0]]]
+    ])
+
+    dice = dice_coefficient(pred, target)
+    print(f"Dice Coefficient = {dice:.4f}")
