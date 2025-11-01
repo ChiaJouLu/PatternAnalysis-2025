@@ -18,6 +18,14 @@ from modules import UNet
 def load_data_with_resize(image_paths, target_size=(256, 128), normImage=True):
     """
     Load the image and resize it to a uniform size.
+
+    Args:
+        image_paths: Paths to the image files to be loaded.
+        target_size: Desired spatial dimensions for the output images.
+        normImage: If true, each image is normalized. Default is true.
+
+    Returns:
+        A NumPy array of shape (N, H, W) containing the processed images.
     """
     n = len(image_paths)
     images = np.zeros((n, target_size[0], target_size[1]), dtype=np.float32)
@@ -45,6 +53,15 @@ def load_data_with_resize(image_paths, target_size=(256, 128), normImage=True):
 def load_labels_with_resize(seg_paths, target_size=(256, 128), n_classes=4):
     """
     Load tags, resize, clean up categories, and perform one-hot encoding.
+
+    Args:
+        seg_paths: Paths to the segmentation label files to be loaded.
+        target_size: Desired output dimensions (height, width) after resizing.
+        n_classes: Number of valid classes for one-hot encoding.
+
+    Returns:
+        A NumPy array of shape (N, H, W, n_classes) containing the processed
+        one-hot encoded labels.
     """
     n = len(seg_paths)
     labels = np.zeros((n, target_size[0], target_size[1], n_classes), dtype=np.float32)
