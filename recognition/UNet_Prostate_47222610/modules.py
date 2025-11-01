@@ -11,21 +11,6 @@ Architecture:
     - Decoder (expanding path): Enables precise localization through upsampling
     - Skip connections: Combine high-resolution features from encoder with 
       upsampled features in decoder
-
-Note:
-    Part of the documentation style and test scaffolding were written
-    with assistance from ChatGPT 4.1. All implementation logic
-    and verification were completed by the author.
-
-Paper Reference:
-    Ronneberger, O., Fischer, P., & Brox, T. (2015).
-    U-Net: Convolutional Networks for Biomedical Image Segmentation.
-    MICCAI 2015.
-    https://arxiv.org/abs/1505.04597
-
-Author: 47222610
-Date: October 2025
-Assignment: Pattern Recognition Project - 2D Prostate Segmentation
 """
 
 import torch
@@ -392,64 +377,3 @@ class UNet(nn.Module):
         
         return logits
 
-
-if __name__ == "__main__":
-    """
-    Test script to verify UNet model architecture with dummy data.
-    """
-    print("="*70)
-    print("Testing UNet Model Architecture")
-    print("="*70)
-    
-    # Create model for HipMRI (1 input channel, 4 output classes)
-    print("\n1. Creating UNet model...")
-    model = UNet(n_channels=1, n_classes=4)
-    print(f"   ✓ Model created successfully")
-    
-    # Count parameters
-    print("\n2. Counting model parameters...")
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"   ✓ Total parameters: {total_params:,}")
-    print(f"   ✓ Trainable parameters: {trainable_params:,}")
-    
-    # Test forward pass with HipMRI dimensions
-    print("\n3. Testing forward pass with HipMRI dimensions...")
-    batch_size = 2
-    x = torch.randn(batch_size, 1, 256, 128)
-    print(f"   Input shape: {x.shape}")
-    
-    with torch.no_grad():
-        output = model(x)
-    
-    print(f"   ✓ Output shape: {output.shape}")
-    print(f"   ✓ Expected shape: torch.Size([{batch_size}, 4, 256, 128])")
-    
-    # Test prediction
-    print("\n4. Testing prediction conversion...")
-    with torch.no_grad():
-        probs = torch.softmax(output, dim=1)
-        pred = torch.argmax(probs, dim=1)
-    
-    print(f"   ✓ Probability shape: {probs.shape}")
-    print(f"   ✓ Prediction shape: {pred.shape}")
-    print(f"   ✓ Unique predicted classes: {torch.unique(pred).tolist()}")
-    
-    # Test model on GPU if available
-    print("\n5. Checking GPU availability...")
-    if torch.cuda.is_available():
-        print(f"   ✓ GPU available: {torch.cuda.get_device_name(0)}")
-        print("   Testing model on GPU...")
-        model_gpu = model.cuda()
-        x_gpu = x.cuda()
-        with torch.no_grad():
-            output_gpu = model_gpu(x_gpu)
-        print(f"   ✓ GPU forward pass successful")
-        print(f"   ✓ GPU output shape: {output_gpu.shape}")
-    else:
-        print("   ⚠ No GPU available, will use CPU for training")
-    
-    print("\n" + "="*70)
-    print("All tests passed! ✓")
-    print("="*70)
-    print("\nUNet model is ready for training.")
