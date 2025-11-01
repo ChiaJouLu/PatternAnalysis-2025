@@ -1,7 +1,6 @@
 """
 Prediction, testing, and visualization for UNet prostate segmentation.
 """
-
 import os
 import glob
 import numpy as np
@@ -20,6 +19,14 @@ from modules import UNet
 def load_data_with_resize(image_paths, target_size=(256, 128), normImage=True):
     """
     Load the image and resize it to a uniform size.
+
+    Args:
+        image_paths: Paths to the image files to be loaded.
+        target_size: Desired spatial dimensions for the output images.
+        normImage: If true, each image is normalized. Default is true.
+
+    Returns:
+        A NumPy array of shape (N, H, W) containing the processed images.
     """
     n = len(image_paths)
     images = np.zeros((n, target_size[0], target_size[1]), dtype=np.float32)
@@ -47,6 +54,15 @@ def load_data_with_resize(image_paths, target_size=(256, 128), normImage=True):
 def load_labels_with_resize(seg_paths, target_size=(256, 128), n_classes=4):
     """
     Load tags, resize, clean up categories, and perform one-hot encoding.
+
+    Args:
+        seg_paths: Paths to the segmentation label files to be loaded.
+        target_size: Desired output dimensions (height, width) after resizing.
+        n_classes: Number of valid classes for one-hot encoding.
+
+    Returns:
+        A NumPy array of shape (N, H, W, n_classes) containing the processed
+        one-hot encoded labels.
     """
     n = len(seg_paths)
     labels = np.zeros((n, target_size[0], target_size[1], n_classes), dtype=np.float32)
@@ -75,6 +91,14 @@ def load_labels_with_resize(seg_paths, target_size=(256, 128), n_classes=4):
 def dice_coefficient_per_class(predicted, target, n_classes=4):
     """
     Calculate Dice coefficient for each class separately.
+
+    Args:
+        predicted: Model predictions of shape (N, C, H, W).
+        target: One-hot encoded ground truth labels of shape (N, C, H, W).
+        n_classes: Number of segmentation classes.
+
+    Returns:
+        dict: A dictionary mapping each class name to its Dice coefficient.
     """
     dice_scores = {}
 
@@ -154,6 +178,13 @@ def test(model, data_loader, device, save_path='results', visualize=False):
 def visualize_prediction(images, labels, predicts, batch_idx, save_path):
     """
     Save a figure showing the input, ground truth, and prediction.
+
+    Args:
+        images: Batch of input MRI images. Only the first image in the batch is visualized.
+        labels: One-hot encoded ground truth masks of shape (N, C, H, W).
+        predicts: Model output probabilities or logits.
+        batch_idx: Index of the current batch.
+        save_path: Directory path where the visualization image will be saved.
     """
     # Get first image from batch
     img = images[0, 0].cpu().numpy()
