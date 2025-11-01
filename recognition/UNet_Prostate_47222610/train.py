@@ -9,13 +9,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-import matplotlib.pyplot as plt
 import glob
 from tqdm import tqdm
 import cv2
 
 from modules import UNet
-from dataset import load_data_2D
 
 def load_data_with_resize(image_paths, target_size=(256, 128), normImage=True):
     """
@@ -188,7 +186,7 @@ def validate(model, data_loader, loss_fn, device):
 
     Args:
         model: The neural network model being evaluated.
-        data_loader: Iterable that provides bathes of validation data.
+        data_loader: Iterable that provides batches of validation data.
         loss_fn: The loss function used to compute prediction error during validation.
         device: The computation device to run the validation on (e.g., 'cuda' or 'cpu').
 
@@ -242,121 +240,63 @@ def validate(model, data_loader, loss_fn, device):
     return avg_loss, avg_dice
 
 
+if __name__ == "__main__":
+    # Configuration
+    data_path = "/home/groups/comp3710/HipMRI_Study_open/keras_slices_data"
+    num_epochs = 20
+    batch_size = 16
+    learning_rate = 1e-4
+    target_size = (256, 128)
 
-
-
-
-def main():
-  # Configuration
-    DATA_PATH = '/home/groups/comp3710/HipMRI_Study_open/keras_slices_data'
-    BATCH_SIZE = 16
-    LEARNING_RATE = 1e-4
-    NUM_EPOCHS = 20
-    TARGET_SIZE = (256, 128)
-    DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    print("="*70)
-    print("2D UNet Prostate Segmentation Training")
-    print("="*70)
-    print(f"Configuration:")
-    print(f"  Target Size: {TARGET_SIZE}")
-    print(f"  Batch Size: {BATCH_SIZE}")
-    print(f"  Learning Rate: {LEARNING_RATE}")
-    print(f"  Epochs: {NUM_EPOCHS}")
-    print(f"  Device: {DEVICE}")
-    print(f"\nClass Labels:")
-    print(f"  Class 0: Background")
-    print(f"  Class 1: Peripheral Zone")
-    print(f"  Class 2: Transition Zone")
-    print(f"  Class 3: Prostate (TARGET - need Dice >= 0.75)")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}\n")
 
     # Load data
-    print("\n[1] Loading training data...")
-    train_image_paths = sorted(glob.glob(f'{DATA_PATH}/keras_slices_train/*.nii.gz'))
-    train_seg_paths = sorted(glob.glob(f'{DATA_PATH}/keras_slices_seg_train/*.nii.gz'))
-
-    X_train = load_data_with_resize(train_image_paths, target_size=TARGET_SIZE, normImage=True)
-    y_train = load_labels_with_resize(train_seg_paths, target_size=TARGET_SIZE, n_classes=4)
-
-    print(f"   Loaded {len(X_train)} training images")
-    print(f"   Image shape: {X_train.shape}")
-    print(f"   Label shape: {y_train.shape}")
-
-    # Convert to PyTorch tensors
-    X_train_tensor = torch.from_numpy(X_train).unsqueeze(1).float()  # (N,1,H,W)
-    y_train_tensor = torch.from_numpy(y_train).permute(0, 3, 1, 2).float()  # (N,4,H,W)
-
-    # Create DataLoader
-    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-
-    print("\n[DEBUG] Checking batch dimensions...")
-    for images, labels in train_loader:
-        print(f"   Images batch shape: {images.shape}")
-        print(f"   Labels batch shape: {labels.shape}")
-        print(f"   Labels argmax shape: {torch.argmax(labels, dim=1).shape}")
-        break
+    print("Loading training data...")
+    train_images = sorted(glob.glob(f'{data_path}/keras_slices_train/*.nii.gz'))
+    train_labels = sorted(glob.glob(f'{data_path}/keras_slices_seg_train/*.nii.gz'))
+    
+    X_train = load_data_with_resize(train_images, target_size=target_size)
+    y_train = load_labels_with_resize(train_labels, target_size=target_size)
+    
+    train_dataset = TensorDataset(
+        torch.from_numpy(X_train).unsqueeze(1).float(),
+        torch.from_numpy(y_train).permute(0, 3, 1, 2).float()
+    )
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     # Initialize model
-    print(f"\n[2] Initializing model on {DEVICE}...")
-    model = UNet(n_channels=1, n_classes=4).to(DEVICE)
+    print("Initializing model...")
+    model = UNet(n_channels=1, n_classes=4).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    print(f"   Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     # Training loop
-    print(f"\n[3] Training for {NUM_EPOCHS} epochs...")
-    print("-"*70)
-
-    for epoch in range(NUM_EPOCHS):
-        train_loss, train_dice = train_one_epoch(
-            model, train_loader, criterion, optimizer, DEVICE
-        )
-
-        # Print detailed results
-        print(f"Epoch [{epoch+1}/{NUM_EPOCHS}] Loss: {train_loss:.4f}")
-        print(f"  Dice Scores:")
-        print(f"    Class 0 (Background):     {train_dice['class_0']:.4f}")
-        print(f"    Class 1 (Peripheral):     {train_dice['class_1']:.4f}")
-        print(f"    Class 2 (Transition):     {train_dice['class_2']:.4f}")
-        print(f"    Class 3 (Prostate):       {train_dice['class_3']:.4f} ★")
-        print("-"*70)
-
-        # Save checkpoint every 10 epochs
+    print(f"\nTraining for {num_epochs} epochs...")
+    for epoch in range(num_epochs):
+        train_loss, train_dice = train_one_epoch(model, train_loader, criterion, optimizer, device)
+        
+        print(f"Epoch [{epoch+1}/{num_epochs}] Loss: {train_loss:.4f} | Prostate Dice: {train_dice['class_3']:.4f}")
+        
         if (epoch + 1) % 10 == 0:
-            checkpoint = {
+            torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'train_loss': train_loss,
                 'train_dice': train_dice,
-            }
-            torch.save(checkpoint, f'unet_epoch_{epoch+1}.pth')
-            print(f"   Checkpoint saved: unet_epoch_{epoch+1}.pth")
-            print("-"*70)
+            }, f'unet_epoch_{epoch+1}.pth')
+            print(f"Saved: unet_epoch_{epoch+1}.pth")
 
     # Save final model
-    final_checkpoint = {
-        'epoch': NUM_EPOCHS,
+    torch.save({
+        'epoch': num_epochs,
         'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'train_loss': train_loss,
         'train_dice': train_dice,
-    }
-    torch.save(final_checkpoint, 'unet_final.pth')
-
-    print("\n[4] Training complete!")
-    print(f"Final Prostate Dice Score: {train_dice['class_3']:.4f}")
-    if train_dice['class_3'] >= 0.75:
-        print("Yeah! Target achieved! (Dice >= 0.75)")
-    else:
-        print("No! Target not reached. Consider training longer or adjusting hyperparameters.")
+    }, 'unet_final.pth')
+        
+    print(f"\nTraining complete!")
+    print(f"Final Prostate Dice: {train_dice['class_3']:.4f}")
     print(f"Model saved to: unet_final.pth")
 
 
-
-if __name__ == "__main__":
-    """
-    Main function to run the training script.
-    """
-    main()
