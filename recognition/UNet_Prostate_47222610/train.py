@@ -1,5 +1,5 @@
 """
-Train Unet for prostate segmentation.
+Train Improved Unet for prostate segmentation.
 
 This is the training script for the HipMRI dataset.
 """
@@ -13,7 +13,7 @@ import glob
 from tqdm import tqdm
 import cv2
 
-from modules import UNet
+from modules import ImprovedUNet
 
 def load_data_with_resize(image_paths, target_size=(256, 128), normImage=True):
     """
@@ -121,21 +121,27 @@ def dice_coefficient_per_class(predicted, target, n_classes=4):
 
 def train_one_epoch(model, data_loader, loss_fn, optimizer, device):
     """
-    This function trains the model for one epoch on the given data loader.
+    This function trains the model for one epoch on the given data loader 
+    with deep supervision.
 
-    It goes through all the training data once and updates the model, includes
-    loss calculation, and backpropagation.
+    Deep supervision weights decrease for deeper layers:
+        - Main output: weight = 1.0
+        - DSV1: weight = 0.8
+        - DSV2: weight = 0.6
+        - DSV3: weight = 0.4
+        - DSV4: weight = 0.2
 
     Args:
-        model: The neural network model to be trained.
-        data_loader: Iterable that provides batches of training data. Each batch
-                     should be a tuple of input tensors and corresponding
-                     segmentation masks or class labels.
-        loss_fn: The loss function used to measure prediction error.
-        optimizer: Updating model parameters (weights) based on computed gradients.
-        device: The computation device to run the training on (e.g., 'cuda' or 'cpu').
-                Both the model and data batches will be moved to this device.
-
+        model: The neural network model to be trained. Its forward may return a tensor
+               or a dict of tensors for deep supervision.
+        data_loader: Iterable providing batches of (images, targets). Images are tensors
+                     of shape (N, C_in, H, W). Targets are class indices (N, H, W) or
+                     one-hot masks depending on loss_fn requirements.
+        loss_fn: The criterion used to measure prediction error (e.g., CrossEntropyLoss
+                 or Dice-based losses). Must accept per-head logits and matched-size targets.
+        optimizer: Optimizer used to update model parameters based on computed gradients.
+        device: Computation device (e.g., 'cuda' or 'cpu'). Model, images, and targets
+                are moved to this device.
     Returns:
         A tuple (avg_loss, avg_dice), where avg_loss (float) is the average loss across
         all batches, and avg_dice (float) is the average Dice coefficient across all batches,
@@ -152,12 +158,15 @@ def train_one_epoch(model, data_loader, loss_fn, optimizer, device):
     }
     batch_count = 0
 
+    # Deep supervision weights
+    ds_weights = [1.0, 0.8, 0.6, 0.4, 0.2]
+
     pbar = tqdm(data_loader, desc='Training')
 
     for images, labels in pbar:
         # Move data to device (GPU/CPU)
-        images = images.to(device) # (N, 1, H, W)
-        labels = labels.to(device) # (N, 4, H, W)
+        images = images.to(device) 
+        labels = labels.to(device) 
 
         # Forward
         outputs = model(images)
@@ -165,16 +174,32 @@ def train_one_epoch(model, data_loader, loss_fn, optimizer, device):
         # Loss Function
         class_indices = torch.argmax(labels, dim=1).long() # (N, H, W)
 
-        loss = loss_fn(outputs, class_indices)
+        if isinstance(outputs, tuple):
+            # Deep supervision is active
+            main_output, dsv1, dsv2, dsv3, dsv4 = outputs
+            
+            loss = (ds_weights[0] * loss_fn(main_output, class_indices) +
+                   ds_weights[1] * loss_fn(dsv1, class_indices) +
+                   ds_weights[2] * loss_fn(dsv2, class_indices) +
+                   ds_weights[3] * loss_fn(dsv3, class_indices) +
+                   ds_weights[4] * loss_fn(dsv4, class_indices))
+        else:
+            # Inference mode, no deep supervision
+            loss = loss_fn(outputs, class_indices)
+            main_output = outputs
 
         # Backpropagation
-        optimizer.zero_grad() # Clean
-        loss.backward() # Calculate
-        optimizer.step() # Update
+        optimizer.zero_grad() 
+        loss.backward() 
+
+        # Gradient clipping for stability
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
+        optimizer.step()
 
         # Use Dice to do monitor (no need gradient here)
         with torch.no_grad():
-            probs = torch.softmax(outputs, dim=1)
+            probs = torch.softmax(main_output, dim=1)
             dice = dice_coefficient_per_class(probs, labels, n_classes=4)
 
         # Accumulate dice scores
@@ -233,8 +258,8 @@ def validate(model, data_loader, loss_fn, device):
             outputs = model(images)
 
             class_indices = torch.argmax(labels, dim=1)
-
             loss = loss_fn(outputs, class_indices)
+
             probs = torch.softmax(outputs, dim=1)
             dice = dice_coefficient_per_class(probs, labels, n_classes=4)
 
@@ -260,9 +285,10 @@ def validate(model, data_loader, loss_fn, device):
 if __name__ == "__main__":
     # Configuration
     data_path = "/home/groups/comp3710/HipMRI_Study_open/keras_slices_data"
-    num_epochs = 20
+    num_epochs = 30
     batch_size = 16
     learning_rate = 1e-4
+    weight_decay = 1e-5  
     target_size = (256, 128)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -284,17 +310,43 @@ if __name__ == "__main__":
 
     # Initialize model
     print("Initializing model...")
-    model = UNet(n_channels=1, n_classes=4).to(device)
+    model = ImprovedUNet(n_channels=1, n_classes=4, deep_supervision=True).to(device)
+
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+
+    # Learning rate scheduler
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=5, verbose=True
+    )
 
     # Training loop
     print(f"\nTraining for {num_epochs} epochs...")
+    best_dice = 0.0
+
     for epoch in range(num_epochs):
         train_loss, train_dice = train_one_epoch(model, train_loader, criterion, optimizer, device)
+
+        scheduler.step(train_loss)
         
-        print(f"Epoch [{epoch+1}/{num_epochs}] Loss: {train_loss:.4f} | Prostate Dice: {train_dice['class_3']:.4f}")
-        
+        print(f"Epoch [{epoch+1}/{num_epochs}]")
+        print(f"  Loss: {train_loss:.4f}")
+        print(f"  Prostate Dice: {train_dice['class_3']:.4f}")
+        print(f"  Learning Rate: {optimizer.param_groups[0]['lr']:.6f}")
+
+        # Save best model
+        if train_dice['class_3'] > best_dice:
+            best_dice = train_dice['class_3']
+            torch.save({
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'train_loss': train_loss,
+                'train_dice': train_dice,
+            }, 'improved_unet_best.pth')
+            print(f"Saved best model (Dice: {best_dice:.4f})")
+
+        # Save checkpoints
         if (epoch + 1) % 10 == 0:
             torch.save({
                 'epoch': epoch + 1,
@@ -302,18 +354,21 @@ if __name__ == "__main__":
                 'optimizer_state_dict': optimizer.state_dict(),
                 'train_loss': train_loss,
                 'train_dice': train_dice,
-            }, f'unet_epoch_{epoch+1}.pth')
-            print(f"Saved: unet_epoch_{epoch+1}.pth")
+            }, f'improved_unet_epoch_{epoch+1}.pth')
+            print(f"Saved checkpoint: improved_unet_epoch_{epoch+1}.pth")
+        
+        print()
 
     # Save final model
     torch.save({
         'epoch': num_epochs,
         'model_state_dict': model.state_dict(),
         'train_dice': train_dice,
-    }, 'unet_final.pth')
+    }, 'improved_unet_final.pth')
         
     print(f"\nTraining complete!")
+    print(f"Best Prostate Dice: {best_dice:.4f}")
     print(f"Final Prostate Dice: {train_dice['class_3']:.4f}")
-    print(f"Model saved to: unet_final.pth")
+    print(f"Model saved to: improved_unet_final.pth")
 
 
