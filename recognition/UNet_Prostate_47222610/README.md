@@ -1,11 +1,19 @@
-# UNet 2D Prostate Segmentation
+# 2D Prostate Segmentation using Improved UNet on HipMRI Dataset
 
-**Author:** 47222610  
-**Task:** Segment HipMRI Study prostate MRI using 2D UNet
+**Author:** Chia Jou Lu  
+**Course:** COMP3710 – Pattern Analysis, The University of Queensland (2025)
+
+This project implements an Improved Unet architecture for automated prostate segmentation from MRI images using the HipMRI Study dataset. The goal is to achieve a Dice similarity coefficient of ≥ 0.75 on the prostate label (Class 3) in the test set.
 
 ## Problem Description
 
-TODO: Describe the segmentation problem
+Medical image segmentation is crucial for radiotherapy planning in prostate cancer. This project segments four anatomical regions from 2D magnetic resonance imaging (MRI) slices:
+- Class 0: Background
+- Class 1: Peripheral Zone (Body Outline)
+- Class 2: Transition Zone (Bone)
+- Class 3: **Prostate (Primary Target)**
+
+The Improved UNet architecture enhances the original UNet through architectural improvements.
 
 ## Dataset
 
