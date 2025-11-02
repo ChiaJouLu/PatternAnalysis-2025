@@ -13,7 +13,7 @@ import nibabel as nib
 import cv2
 from tqdm import tqdm
 
-from modules import UNet
+from modules import ImprovedUNet
 
 
 def load_data_with_resize(image_paths, target_size=(256, 128), normImage=True):
@@ -285,8 +285,8 @@ def main():
 
     # Load model
     print("Loading model...")
-    model = UNet(n_channels=1, n_classes=4).to(device)
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    model = ImprovedUNet(n_channels=1, n_classes=4, deep_supervision=False).to(device)
+    checkpoint = torch.load('improved_unet_final.pth', map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
 
     # Load test data
