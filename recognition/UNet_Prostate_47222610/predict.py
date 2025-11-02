@@ -287,7 +287,7 @@ def main():
     print("Loading model...")
     model = ImprovedUNet(n_channels=1, n_classes=4, deep_supervision=False).to(device)
     checkpoint = torch.load('improved_unet_final.pth', map_location=device)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
     # Load test data
     print(f"Loading {test_split} dataset...")
