@@ -99,8 +99,90 @@ Input: (N, 1, 256, 128) - Grayscale MRI images
 1. Load NIFTI files with nibabel
 2. Resize to 256x128
 3. Z-score normalization: '(img - mean) / std'
-4. Clean invalid labels (≥4 → class 0)
+4. Clean invalid labels (≥4 -> class 0)
 5. One-hot encode to 4 classes
+
+## Dependencies
+```bash
+torch>=2.0.0
+numpy>=1.24.0
+nibabel>=5.0.0
+matplotlib>=3.7.0
+opencv-python>=4.7.0
+tqdm>=4.65.0
+```
+
+## Project Structure
+```
+UNet_Prostate_47222610/
+├── README.md               # This file
+├── dataset.py              # Data loading and preprocessing for MRI slices
+├── modules.py              # Improved UNet architecture
+├── predict.py              # Testing and visualization
+└── train.py                # Training with deep supervision
+```
+
+## Reproducibility
+
+### Training Configuration
+
+**Fixed Hyperparameters**:
+- Architecture: Improved UNet (5-level encoder/decoder)
+- Epochs: 30
+- Batch size: 16
+- Learning rate: 1e-4 (Adam optimizer)
+- Weight decay: 1e-5 (L2 regularization)
+- Loss function: CrossEntropyLoss + Deep Supervision
+- Image size: 256×128
+- Number of classes: 4
+
+### File Outputs Summary
+
+After training and evaluation:
+```
+UNet_Prostate_47222610/
+├── improved_unet_best.pth           # Best model 
+├── improved_unet_final.pth          # Final model 
+├── improved_unet_epoch_*.pth        # Checkpoints 
+├── logs/
+│   └── improved_unet_*.out          # Training logs (text)
+└── results/
+    ├── training_curves.png          # Loss/Dice plots
+    └── prediction_batch_*.png       # Sample predictions
+```
+
+## Results
+
+### Test Set Performance
+| Class | Region | Dice |
+|-------|--------|------|
+
+
+
+
+### Visualizations
+
+
+
+
+## References
+
+
+
+## Academic Integrity
+
+
+
+## Author
+**Student Name**: Chia Jou Lu
+**Student ID**: 47222610
+**Course**: COMP3710 Pattern Recognition 
+**Institution**: The University of Queensland  
+**Date**: November 2025
+
+
+
+
 
 
 
