@@ -122,11 +122,32 @@ UNet_Prostate_47222610/
 └── train.py                # Training with deep supervision
 ```
 
+## Usage
+
+### Training
+
+```bash
+python train.py
+```
+
+Training parameters are hardcoded: 30 epochs, batch size 16, learning rate 1e-4.
+
+### Testing
+
+```bash
+python predict.py
+```
+
+## Training Environment
+
+- **Platform**: Rangpur HPC (The University of Queensland)
+- **GPU**: NVIDIA A100
+- **Training Time**: ~2 hours for 30 epochs
+
 ## Reproducibility
 
 ### Training Configuration
 
-**Fixed Hyperparameters**:
 - Architecture: Improved UNet (5-level encoder/decoder)
 - Epochs: 30
 - Batch size: 16
@@ -156,9 +177,14 @@ UNet_Prostate_47222610/
 ### Test Set Performance
 | Class | Region | Dice |
 |-------|--------|------|
+| 0 | Background | 0.9881 |
+| 1 | Peripheral Zone | 0.9842 |
+| 2 | Transition Zone | 0.9271 |
+| 3 | **Prostate (Target)** | **0.9552** |
 
-
-
+**Project Requirement**: Prostate Dice ≥ 0.75  
+**Achievement**: **0.9552** (Exceeds requirement by 27.4%)  
+**Status**: PASSED
 
 ### Visualizations
 
@@ -166,12 +192,17 @@ UNet_Prostate_47222610/
 
 
 ## References
+1. **Isensee, F., et al. (2019)**. "nnU-Net: Self-adapting Framework for U-Net-Based Medical Image Segmentation." arXiv preprint arXiv:1809.10486.
 
+2. **Ronneberger, O., Fischer, P., & Brox, T. (2015)**. "U-Net: Convolutional Networks for Biomedical Image Segmentation." MICCAI 2015.
 
+3. **Yu, F., & Koltun, V. (2016)**. "Multi-Scale Context Aggregation by Dilated Convolutions." ICLR 2016.
+
+4. **COMP3710 Assignment Specification**. The University of Queensland, 2025.
 
 ## Academic Integrity
-
-
+- Code written independently following course materials and cited papers
+- AI tools (ChatGPT) were used to assist in understanding and to provide reference material for writing docstrings
 
 ## Author
 **Student Name**: Chia Jou Lu
