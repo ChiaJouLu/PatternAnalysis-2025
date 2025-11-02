@@ -1,7 +1,6 @@
 # 2D Prostate Segmentation using Improved UNet on HipMRI Dataset
 
-**Author:** Chia Jou Lu  
-**Course:** COMP3710 – Pattern Analysis, The University of Queensland (2025)
+**Project**: #3 - HipMRI 2D Segmentation with Improved UNet  
 
 This project implements an **Improved Unet** architecture for automated prostate segmentation from MRI images using the HipMRI Study dataset. The goal is to achieve a Dice similarity coefficient of ≥ 0.75 on the prostate label (Class 3) in the test set.
 
@@ -115,11 +114,18 @@ tqdm>=4.65.0
 ## Project Structure
 ```
 UNet_Prostate_47222610/
-├── README.md               # This file
-├── dataset.py              # Data loading and preprocessing for MRI slices
-├── modules.py              # Improved UNet architecture
-├── predict.py              # Testing and visualization
-└── train.py                # Training with deep supervision
+├── README.md                 # This file
+├── dataset.py                # Data loading and preprocessing for MRI slices
+├── modules.py                # Improved UNet architecture
+├── predict.py                # Testing and visualization
+├── train.py                  # Training with deep supervision
+└── Result_Images/            # Visualization results
+    ├── training_curves.png
+    ├── prediction_batch_0.png
+    ├── prediction_batch_1.png
+    ├── prediction_batch_2.png
+    ├── prediction_batch_3.png
+    └── prediction_batch_4.png
 ```
 
 ## Usage
@@ -167,7 +173,7 @@ UNet_Prostate_47222610/
 ├── improved_unet_epoch_*.pth        # Checkpoints 
 ├── logs/
 │   └── improved_unet_*.out          # Training logs (text)
-└── results/
+└── Result_Images/
     ├── training_curves.png          # Loss/Dice plots
     └── prediction_batch_*.png       # Sample predictions
 ```
@@ -188,11 +194,18 @@ UNet_Prostate_47222610/
 
 ### Visualizations
 
+![Training Curves](Result_Images/training_curves.png)
 
+*Figure 1: Training loss and prostate Dice coefficient over 30 epochs.*
 
+![Sample Predictions](Result_Images/prediction_batch_0.png)
+![Sample Predictions](Result_Images/prediction_batch_1.png)
+![Sample Predictions](Result_Images/prediction_batch_2.png)
+
+*Figure 2: Sample predictions on test set. Left: Input MRI, Center: Ground truth, Right: Model prediction.*
 
 ## References
-1. **Isensee, F., et al. (2019)**. "nnU-Net: Self-adapting Framework for U-Net-Based Medical Image Segmentation." arXiv preprint arXiv:1809.10486.
+1. **Isensee, F., Kickingereder, P., Wick, W., Bendszus, M., & Maier-Hein, K. H. (2018)**. "Brain Tumor Segmentation and Radiomics Survival Prediction: Contribution to the BRATS 2017 Challenge." arXiv preprint arXiv:1802.10508.
 
 2. **Ronneberger, O., Fischer, P., & Brox, T. (2015)**. "U-Net: Convolutional Networks for Biomedical Image Segmentation." MICCAI 2015.
 
@@ -205,10 +218,15 @@ UNet_Prostate_47222610/
 - AI tools (ChatGPT) were used to assist in understanding and to provide reference material for writing docstrings
 
 ## Author
+
 **Student Name**: Chia Jou Lu
+
 **Student ID**: 47222610
+
 **Course**: COMP3710 Pattern Recognition 
+
 **Institution**: The University of Queensland  
+
 **Date**: November 2025
 
 
