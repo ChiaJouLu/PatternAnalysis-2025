@@ -15,19 +15,31 @@ Medical image segmentation is crucial for radiotherapy planning in prostate canc
 
 The Improved UNet architecture enhances the original UNet through architectural improvements.
 
-## Dataset
-
-TODO: Describe the HipMRI dataset
-- Number of samples
-- Image size
-- Number of classes
-
 ## Model Architecture
 
-TODO: Describe UNet2D architecture
-- Encoder layers
-- Bottleneck
-- Decoder layers
+### Improved UNet vs Standard UNet
+The improved UNet incorporates several improvements over the original UNet:
+
+**Key Improvements:**
+1. **Deeper Network**: There are 5 levels of encoding/ decoding in Improved UNet, but only 4 in standard UNet.
+2. **Residual Connections**: Skip connections using residual blocks for better gradient flow.
+3. **Instance Normalization**: More stable than batch normalization for small batch sizes.
+4. **Leaky ReLU**: Prevents the ReLU function from failing on negative slopes (alpha = 0.01).
+5. **Deep Supervision**: Additional loss at intermediate decoder layers.
+6. **Context Module**: Additional context aggregation at bottleneck.
+
+### Architecture Overview:
+```
+Input (1, 256, 128)
+    
+[Encoder Path]
+  Level 0: 1 -> 64 channels (256x128)
+  Level 1: 64 -> 128 channels (128×64)
+  Level 2: 128 -> 256 channels (64×32)
+  Level 3: 256 -> 512 channels (32×16)
+  Level 4: 512 -> 1024 channels (16×8) 
+```
+
 
 ## Requirements
 
