@@ -213,8 +213,8 @@ def visualize_prediction(images, labels, predicts, batch_idx, save_path):
     from matplotlib.patches import Patch
     legend_elements = [
         Patch(facecolor='tab:blue', label='Background'),
-        Patch(facecolor='tab:red', label='Peripheral Zone'),
-        Patch(facecolor='tab:pink', label='Transition Zone'),
+        Patch(facecolor='tab:red', label='Body'),
+        Patch(facecolor='tab:pink', label='Bone'),
         Patch(facecolor='tab:cyan', label='Prostate')
     ]
     fig.legend(handles=legend_elements, loc='lower center', ncol=4, 
