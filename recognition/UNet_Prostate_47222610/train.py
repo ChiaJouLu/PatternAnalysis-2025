@@ -152,8 +152,8 @@ def train_one_epoch(model, data_loader, loss_fn, optimizer, device):
     running_loss = 0.0
     running_dice = {
         'class_0': 0.0,  # Background
-        'class_1': 0.0,  # Peripheral Zone
-        'class_2': 0.0,  # Transition Zone
+        'class_1': 0.0,  # Body
+        'class_2': 0.0,  # Bone
         'class_3': 0.0   # Prostate (MAIN TARGET)
     }
     batch_count = 0
