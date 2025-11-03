@@ -141,8 +141,8 @@ def test(model, data_loader, device, save_path='results', visualize=False):
 
     running_dice = {
         'class_0': 0.0,  # Background
-        'class_1': 0.0,  # Peripheral Zone
-        'class_2': 0.0,  # Transition Zone
+        'class_1': 0.0,  # Body
+        'class_2': 0.0,  # Bone
         'class_3': 0.0   # Prostate (MAIN TARGET)
     }
     batch_count = 0
@@ -313,7 +313,7 @@ def main():
     print("\n" + "="*60)
     print("TEST SET RESULTS")
     print("="*60)
-    class_names = ['Background', 'Peripheral Zone', 'Transition Zone', 'Prostate']
+    class_names = ['Background', 'Body', 'Bone', 'Prostate']
     for i, name in enumerate(class_names):
         print(f"{name:20s}: Dice = {results[f'class_{i}']:.4f}")
     print("="*60)
