@@ -8,8 +8,8 @@ This project implements an **Improved Unet** architecture for automated prostate
 
 Medical image segmentation is crucial for radiotherapy planning in prostate cancer. This project segments four anatomical regions from 2D magnetic resonance imaging (MRI) slices:
 - Class 0: Background
-- Class 1: Peripheral Zone (Body Outline)
-- Class 2: Transition Zone (Bone)
+- Class 1: Body 
+- Class 2: Bone
 - Class 3: **Prostate (Primary Target)**
 
 The Improved UNet architecture enhances the original UNet through architectural improvements.
@@ -184,8 +184,8 @@ UNet_Prostate_47222610/
 | Class | Region | Dice |
 |-------|--------|------|
 | 0 | Background | 0.9881 |
-| 1 | Peripheral Zone | 0.9842 |
-| 2 | Transition Zone | 0.9271 |
+| 1 |  Body | 0.9842 |
+| 2 | Bone | 0.9271 |
 | 3 | **Prostate (Target)** | **0.9552** |
 
 **Project Requirement**: Prostate Dice ≥ 0.75  
